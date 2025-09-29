@@ -3,8 +3,8 @@ services:
     name: bitbucket-analyzer
     plan: free
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9.18
+        value: 3.11.9
