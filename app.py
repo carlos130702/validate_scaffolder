@@ -1384,6 +1384,420 @@ if isinstance(df, pd.DataFrame) and "Nombre de función correcta" and "Nombre de
 _ = df
 
 
+@app.route('/')
+def index():
+    return '''
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>🚀 Analizador de Repositorios Bitbucket</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }
+            
+            .container {
+                max-width: 1000px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 15px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+            
+            .header {
+                background: #2c3e50;
+                color: white;
+                padding: 30px;
+                text-align: center;
+            }
+            
+            .header h1 {
+                font-size: 2.5em;
+                margin-bottom: 10px;
+            }
+            
+            .header p {
+                font-size: 1.2em;
+                opacity: 0.9;
+            }
+            
+            .form-section {
+                padding: 30px;
+            }
+            
+            .form-group {
+                margin-bottom: 25px;
+            }
+            
+            label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 600;
+                color: #2c3e50;
+                font-size: 14px;
+            }
+            
+            input, textarea {
+                width: 100%;
+                padding: 12px 15px;
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+                font-size: 16px;
+                transition: border-color 0.3s ease;
+            }
+            
+            input:focus, textarea:focus {
+                border-color: #4285f4;
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+            }
+            
+            .button-group {
+                display: flex;
+                gap: 15px;
+                flex-wrap: wrap;
+                margin-top: 30px;
+            }
+            
+            button {
+                background: #4285f4;
+                color: white;
+                padding: 15px 30px;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            button:hover {
+                background: #3367d6;
+                transform: translateY(-2px);
+            }
+            
+            button:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+                transform: none;
+            }
+            
+            .btn-secondary {
+                background: #6c757d;
+            }
+            
+            .btn-secondary:hover {
+                background: #545b62;
+            }
+            
+            .loading {
+                display: none;
+                text-align: center;
+                padding: 40px;
+                background: #f8f9fa;
+                border-radius: 10px;
+                margin: 20px 0;
+            }
+            
+            .spinner {
+                border: 4px solid #f3f3f3;
+                border-top: 4px solid #4285f4;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            .resultado {
+                display: none;
+                margin-top: 30px;
+                padding: 0;
+                border-radius: 10px;
+                border: 1px solid #e9ecef;
+            }
+            
+            .result-header {
+                background: #28a745;
+                color: white;
+                padding: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            
+            .result-content {
+                padding: 25px;
+                max-height: 600px;
+                overflow-y: auto;
+            }
+            
+            .section {
+                margin-bottom: 25px;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 8px;
+                border-left: 4px solid #4285f4;
+            }
+            
+            .section h3 {
+                color: #2c3e50;
+                margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .metric-card {
+                background: white;
+                padding: 15px;
+                margin: 10px 0;
+                border-radius: 6px;
+                border: 1px solid #e9ecef;
+            }
+            
+            .estado-ok { color: #28a745; font-weight: bold; }
+            .estado-error { color: #dc3545; font-weight: bold; }
+            .estado-warning { color: #ffc107; font-weight: bold; }
+            
+            .help-text {
+                font-size: 12px;
+                color: #6c757d;
+                margin-top: 5px;
+                font-style: italic;
+            }
+            
+            .required {
+                color: #dc3545;
+            }
+            
+            @media (max-width: 768px) {
+                .container {
+                    margin: 10px;
+                }
+                
+                .header h1 {
+                    font-size: 2em;
+                }
+                
+                .button-group {
+                    flex-direction: column;
+                }
+                
+                button {
+                    width: 100%;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🚀 Analizador de Repositorios Bitbucket</h1>
+                <p>Analiza automáticamente la calidad de código de tus repositorios</p>
+            </div>
+            
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="url">URL del Repositorio Bitbucket <span class="required">*</span></label>
+                    <input type="url" id="url" placeholder="https://bitbucket.globaldevtools.bbva.com/bitbucket/projects/..." required>
+                    <div class="help-text">URL completa del repositorio de Bitbucket</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="rama">Rama a analizar <span class="required">*</span></label>
+                    <input type="text" id="rama" placeholder="master" value="master" required>
+                    <div class="help-text">Nombre de la rama que deseas analizar</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="token">Token de Bitbucket (opcional)</label>
+                    <input type="password" id="token" placeholder="Ingresa tu token si es necesario">
+                    <div class="help-text">Token para autenticación con la API de Bitbucket</div>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="analizar()" id="btnAnalizar">
+                        <span>🔍</span> Ejecutar Análisis
+                    </button>
+                    <button onclick="limpiar()" class="btn-secondary">
+                        <span>🔄</span> Limpiar
+                    </button>
+                </div>
+            </div>
+
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <h3>⏳ Analizando repositorio...</h3>
+                <p>Esto puede tomar unos momentos mientras revisamos todos los archivos</p>
+            </div>
+
+            <div id="resultado" class="resultado">
+                <!-- Los resultados se cargan aquí dinámicamente -->
+            </div>
+        </div>
+
+        <script>
+            function analizar() {
+                const url = document.getElementById('url').value.trim();
+                const rama = document.getElementById('rama').value.trim();
+                const token = document.getElementById('token').value.trim();
+                
+                if (!url) {
+                    alert('❌ Por favor ingresa una URL válida');
+                    return;
+                }
+                
+                if (!rama) {
+                    alert('❌ Por favor ingresa el nombre de la rama');
+                    return;
+                }
+                
+                // Mostrar loading
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('resultado').style.display = 'none';
+                document.getElementById('btnAnalizar').disabled = true;
+                
+                // Enviar petición
+                fetch('/analizar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        rama: rama,
+                        token: token
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    mostrarResultado(data);
+                })
+                .catch(error => {
+                    mostrarError(error);
+                })
+                .finally(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('btnAnalizar').disabled = false;
+                });
+            }
+            
+            function mostrarResultado(data) {
+                const resultadoDiv = document.getElementById('resultado');
+                
+                if (data.success) {
+                    let html = `
+                        <div class="result-header">
+                            <h2><span>✅</span> Análisis Completado</h2>
+                            <span>${new Date().toLocaleString()}</span>
+                        </div>
+                        <div class="result-content">
+                    `;
+                    
+                    // Mostrar datos del análisis
+                    if (data.data && data.columns) {
+                        html += '<div class="section"><h3>📊 Resultados del Análisis</h3>';
+                        
+                        data.columns.forEach((columna, index) => {
+                            if (data.data[columna] && data.data[columna][0]) {
+                                const valor = data.data[columna][0];
+                                const estado = getEstadoFromValor(valor);
+                                
+                                html += `
+                                    <div class="metric-card">
+                                        <strong>${columna}:</strong>
+                                        <span class="${estado.clase}">${valor}</span>
+                                    </div>
+                                `;
+                            }
+                        });
+                        
+                        html += '</div>';
+                    }
+                    
+                    html += `</div></div>`;
+                    resultadoDiv.innerHTML = html;
+                } else {
+                    mostrarError(data.error);
+                }
+                
+                resultadoDiv.style.display = 'block';
+            }
+            
+            function mostrarError(error) {
+                const resultadoDiv = document.getElementById('resultado');
+                const errorMsg = typeof error === 'string' ? error : error.message || 'Error desconocido';
+                
+                resultadoDiv.innerHTML = `
+                    <div class="result-header" style="background: #dc3545;">
+                        <h2><span>❌</span> Error en el Análisis</h2>
+                    </div>
+                    <div class="result-content">
+                        <div class="section">
+                            <h3>⚠️ Detalles del Error</h3>
+                            <div class="metric-card">
+                                <strong>Error:</strong>
+                                <span class="estado-error">${errorMsg}</span>
+                            </div>
+                            <p>Verifica que la URL sea correcta y que tengas acceso al repositorio.</p>
+                        </div>
+                    </div>
+                `;
+                resultadoDiv.style.display = 'block';
+            }
+            
+            function limpiar() {
+                document.getElementById('url').value = '';
+                document.getElementById('rama').value = 'master';
+                document.getElementById('token').value = '';
+                document.getElementById('resultado').style.display = 'none';
+                document.getElementById('resultado').innerHTML = '';
+            }
+            
+            function getEstadoFromValor(valor) {
+                if (valor.includes('✅') || valor.includes('OK')) {
+                    return { clase: 'estado-ok' };
+                } else if (valor.includes('❌') || valor.includes('ERROR')) {
+                    return { clase: 'estado-error' };
+                } else if (valor.includes('⚠️') || valor.includes('WARNING')) {
+                    return { clase: 'estado-warning' };
+                }
+                return { clase: '' };
+            }
+            
+            // Enter key support
+            document.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    analizar();
+                }
+            });
+        </script>
+    </body>
+    </html>
+    '''
+
+# === API ENDPOINTS ===
 @app.route('/analizar', methods=['POST'])
 def analizar():
     try:
