@@ -4,7 +4,7 @@ services:
     plan: free
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    startCommand: gunicorn app:app --bind 0.0.0.0:10000 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9

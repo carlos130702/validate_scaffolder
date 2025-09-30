@@ -1180,9 +1180,64 @@ def data_frame(url_repository, rama, token):
     else:
         print("🔤 Verbos en funciones: ❌ Problemas detectados")
         if verbos_output != "OK":
-            for line in verbos_output.split('\n'):
-                if line.strip():
-                    print(f"   {line}")
+            print("\n   📋 FUNCIONES IDENTIFICADAS:")
+            print("   " + "=" * 50)
+            
+            # Procesar y formatear la salida
+            lines = verbos_output.split('\n')
+            current_file = ""
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                # Detectar si es un archivo nuevo
+                if line.endswith(':') or ':' in line and not any(char.isdigit() for char in line.split(':')[0]):
+                    if ':' in line:
+                        file_part = line.split(':')[0]
+                        current_file = file_part.strip()
+                        print(f"\n   📁 {current_file}:")
+                    else:
+                        current_file = line.replace(':', '').strip()
+                        print(f"\n   📁 {current_file}:")
+                        
+                # Detectar líneas con funciones numeradas
+                elif any(char.isdigit() for char in line) and ('.' in line or line.startswith(('1', '2', '3', '4', '5', '6', '7', '8', '9'))):
+                    # Separar las funciones numeradas
+                    functions = []
+                    current_func = ""
+                    
+                    # Procesar la línea para separar funciones
+                    parts = line.split()
+                    i = 0
+                    while i < len(parts):
+                        if parts[i].endswith('.') and parts[i][:-1].isdigit():
+                            # Es un número, empezar nueva función
+                            if current_func:
+                                functions.append(current_func.strip())
+                            current_func = parts[i] + " " + (parts[i+1] if i+1 < len(parts) else "")
+                            i += 2
+                        else:
+                            current_func += " " + parts[i]
+                            i += 1
+                    
+                    if current_func:
+                        functions.append(current_func.strip())
+                    
+                    # Imprimir funciones formateadas
+                    for func in functions:
+                        if func.strip():
+                            print(f"     {func}")
+                            
+                # Para líneas que son claramente nombres de archivo sin ":"
+                elif any(ext in line for ext in ['.py', '.py:']):
+                    current_file = line.replace(':', '').strip()
+                    print(f"\n   📁 {current_file}:")
+                    
+                else:
+                    # Línea normal de texto
+                    print(f"     {line}")
 
     # Fields
     if conf_check_field_fields == "✅ OK":
@@ -1190,9 +1245,16 @@ def data_frame(url_repository, rama, token):
     else:
         print("🏷️  Fields/FIELDS: ❌ Problemas detectados")
         if conf_check_field_fields != "✅ OK":
-            for line in conf_check_field_fields.split('\n'):
+            print("\n   ⚠️  ERRORES ENCONTRADOS:")
+            print("   " + "-" * 30)
+            lines = conf_check_field_fields.split('\n')
+            for line in lines:
                 if line.strip():
-                    print(f"   {line}")
+                    if "–" in line:  # Línea con formato FIELD – FIELD
+                        field_error = line.strip()
+                        print(f"\n   🔸 {field_error}")
+                    elif "Se encontraron" in line or "errores" in line:
+                        print(f"\n   📊 {line.strip()}")
 
     print("\n🌎 IDIOMA Y DOCUMENTACIÓN")
     print("-" * 30)
@@ -1634,7 +1696,7 @@ def index():
                             <h2><span>✅</span> Análisis Completado</h2>
                             <span>${new Date().toLocaleString()}</span>
                         </div>
-                        <div class="result-content">
+                        <div class="result-content">    
                     `;
                     
                     // Mostrar datos del análisis
