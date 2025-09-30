@@ -73,6 +73,7 @@ def read_content_file_of_repository(url_bitbucket, filename, name_branch, token)
 
     name_project = url_bitbucket.split("/")[-4]
     name_repository = url_bitbucket.split("/")[-2]
+    
     target_api = "https://bitbucket.globaldevtools.bbva.com/bitbucket/rest/api/latest/projects/{}/repos/{}/raw/{}?at=refs%2Fheads%2F{}".format(
         name_project, name_repository, filename, name_branch_x
     )
@@ -1377,7 +1378,7 @@ def index():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>🚀 Analizador de Repositorios Bitbucket</title>
+        <title>🚀 Validador de Repositorios Scaffolder</title>
         <style>
             * {
                 margin: 0;
@@ -1593,13 +1594,57 @@ def index():
                     width: 100%;
                 }
             }
+            /* Estilos para listas formateadas */
+            .list-card {
+                background: #f8f9fa !important;
+                border-left: 4px solid #007bff !important;
+            }
+
+            .list-content {
+                font-family: 'Courier New', monospace;
+                font-size: 13px;
+                line-height: 1.4;
+                margin-top: 10px;
+                padding: 10px;
+                background: white;
+                border-radius: 5px;
+                border: 1px solid #e9ecef;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+
+            .list-header {
+                font-weight: bold;
+                color: #2c3e50;
+                margin: 8px 0 4px 0;
+                padding-bottom: 4px;
+                border-bottom: 1px solid #dee2e6;
+            }
+
+            .list-item {
+                padding: 2px 0 2px 15px;
+                margin: 1px 0;
+            }
+
+            .list-bullet {
+                padding: 2px 0 2px 10px;
+                margin: 1px 0;
+            }
+
+            .list-line {
+                padding: 2px 0;
+                margin: 1px 0;
+            }
+
+            .estado-ok { color: #28a745; font-weight: bold; }
+            .estado-error { color: #dc3545; font-weight: bold; }
+            .estado-warning { color: #ffc107; font-weight: bold; }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🚀 Analizador de Repositorios Bitbucket</h1>
-                <p>Analiza automáticamente la calidad de código de tus repositorios</p>
+                <h1>🚀 Validador de Repositorios Scaffolder</h1>
             </div>
             
             <div class="form-section">
