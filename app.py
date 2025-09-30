@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import os
 import sys
@@ -1293,49 +1293,127 @@ def data_frame(url_repository, rama, token):
     else:
         print("⚡ UDF: ❌ Se detectaron UDFs")
         lines = udf_output.split('\n')
-        for i, line in enumerate(lines[:3]):  # Mostrar solo primeros 3
+        for i, line in enumerate(lines[:3]):
             if line.strip():
                 print(f"   {i+1}. {line}")
 
     comment_errors = len([line for line in resultado_pr.split('\n') if "Comentarios invalidos" in line])
     if comment_errors == 0:
-        print("💬 Código comentado: ✅ Correcto")
+        print("💬 CÓDIGO COMENTADO INVÁLIDO:")
+        print("   ✅ Todos los archivos están correctos")
+        print("   📊 Resumen: 0 problemas encontrados")
     else:
-        print(f"💬 Código comentado: ❌ {comment_errors} archivos con problemas")
+        print(f"💬 CÓDIGO COMENTADO INVÁLIDO:")
+        print(f"   ❌ Se encontraron {comment_errors} archivos con problemas")
+        print("   📋 Archivos verificados:")
+        
+        # Procesar cada línea para mejor formato
         for line in resultado_pr.split('\n'):
-            if line.strip():
-                if "Comentarios invalidos" in line:
-                    print(f"   📄 {line}")
-                elif line.startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.')):
-                    print(f"     {line}")
+            line = line.strip()
+            if not line:
+                continue
+                
+            if "Comentarios invalidos" in line:
+                print(f"     🚨 {line}")
+            elif line.endswith(" - ok"):
+                archivo = line.replace(" - ok", "").strip()
+                print(f"     ✅ {archivo} - Correcto")
+            elif line == "---":
+                print("     " + "─" * 35)
+            elif line.startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.')):
+                print(f"       {line}")
 
+    # CONTROL DE VERSIONES - CON COMPARACIÓN
     print("\n🔢 CONTROL DE VERSIONES")
-    print("-" * 30)
+    print("─" * 50)
 
     version_lines = resultado_validacion_versiones.split('\n')
     if version_lines and "iguales" in version_lines[0].lower():
-        print("📦 Versiones: ✅ Consistentes")
-        for line in version_lines[1:]:  # Mostrar detalles
-            if line.strip() and line.startswith('-'):
-                print(f"   {line}")
-    else:
-        print("📦 Versiones: ❌ Inconsistentes")
+        print("📦 RESULTADO: ✅ VERSIONES CONSISTENTES")
+        print("   📊 Todas las versiones coinciden:")
+        
+        # Extraer la versión correcta
+        version_correcta = None
         for line in version_lines:
-            if line.strip():
-                print(f"   {line}")
-
-    if salida.strip():
-        print("\n⚠️  VARIABLES CON PATRÓN DE VERBOS")
-        print("-" * 40)
-        files_with_verbs = len([line for line in salida.split('\n') if line.endswith(':')])
-        print(f"Se encontraron {files_with_verbs} archivos con variables que siguen patrón de verbos")
-        # MOSTRAR TODOS los archivos y variables
-        for line in salida.split('\n'):
-            if line.strip():
-                if line.endswith(':'):
-                    print(f"   📁 {line}")
-                elif line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.')):
-                    print(f"     {line}")
+            if 'setup.cfg:' in line:
+                version_correcta = line.split(':')[1].strip()
+                break
+        
+        for line in version_lines[1:]:
+            line = line.strip()
+            if not line:
+                continue
+                
+            if line.startswith('-'):
+                # Limpiar y formatear la línea
+                clean_line = line.replace('- [ ]', '').replace('-', '').replace('**', '').strip()
+                if ':' in clean_line:
+                    archivo, version = clean_line.split(':', 1)
+                    archivo = archivo.strip()
+                    version = version.strip()
+                    print(f"     ✅ {archivo}: {version} ← CORRECTO")
+                else:
+                    print(f"     📋 {clean_line}")
+            elif line.startswith('**'):
+                clean_line = line.replace('**', '').strip()
+                if ':' in clean_line:
+                    archivo, version = clean_line.split(':', 1)
+                    print(f"     📄 {archivo.strip()}: {version.strip()} ← CORRECTO")
+                else:
+                    print(f"     📄 {clean_line}")
+                    
+    else:
+        print("📦 RESULTADO: ❌ VERSIONES INCONSISTENTES")
+        print("   ⚠️  Se detectaron diferencias:")
+        
+        # Encontrar la versión de referencia (setup.cfg)
+        version_referencia = None
+        for line in version_lines:
+            if 'setup.cfg:' in line:
+                version_referencia = line.split(':')[1].strip()
+                break
+        
+        if version_referencia:
+            print(f"   🎯 Versión de referencia (setup.cfg): {version_referencia}")
+            print("   📊 Comparación con otros archivos:")
+        
+        for line in version_lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            if 'setup.cfg:' in line:
+                # Esta es la versión de referencia
+                archivo, version = line.split(':', 1)
+                archivo = archivo.replace('- [ ]', '').replace('**', '').strip()
+                version = version.strip()
+                print(f"     🎯 {archivo}: {version} ← REFERENCIA")
+                
+            elif 'setup.py:' in line or '__init__.py:' in line or 'Kaafile:' in line:
+                # Otros archivos - comparar con referencia
+                archivo, version = line.split(':', 1)
+                archivo = archivo.replace('- [ ]', '').replace('**', '').strip()
+                version = version.strip()
+                
+                if version_referencia and version == version_referencia:
+                    print(f"     ✅ {archivo}: {version} ← COINCIDE")
+                elif version_referencia:
+                    print(f"     ❌ {archivo}: {version} ← DEBERÍA SER: {version_referencia}")
+                else:
+                    print(f"     ❌ {archivo}: {version} ← INCONSISTENTE")
+                    
+            elif line.startswith('- [ ]'):
+                clean_line = line.replace('- [ ]', '').strip()
+                if ':' in clean_line:
+                    archivo, version = clean_line.split(':', 1)
+                    if version_referencia and version.strip() == version_referencia:
+                        print(f"     ✅ {archivo.strip()}: {version.strip()} ← COINCIDE")
+                    elif version_referencia:
+                        print(f"     ❌ {archivo.strip()}: {version.strip()} ← DEBERÍA SER: {version_referencia}")
+                    else:
+                        print(f"     ❌ {archivo.strip()}: {version.strip()} ← INCONSISTENTE")
+                else:
+                    print(f"     📋 {clean_line}")
 
     print("\n" + "=" * 80)
     print("✅ ANÁLISIS COMPLETADO")
@@ -1358,7 +1436,7 @@ def data_frame(url_repository, rama, token):
         "Input/Output Var. Entorno": [input_output_check],
         "CONTRIBUTING/README": [contributing_readme_check],
         "Palabra con idioma inválido": [english_validation_general],
-        "Nombre de función correcta": [verbos_output],
+        "Nombre de función incorrecta": [verbos_output],
         "Field y Fields Incorrectos": [conf_check_field_fields],
         "Nombre de campo/variable incorrectos": [salida],
         "Uso de Pandas": [result_pandas_str],
@@ -1372,477 +1450,8 @@ def data_frame(url_repository, rama, token):
 
 @app.route('/')
 def index():
-    return '''
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>🚀 Validador de Repositorios Scaffolder</title>
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            
-            body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh;
-                padding: 20px;
-            }
-            
-            .container {
-                max-width: 1000px;
-                margin: 0 auto;
-                background: white;
-                border-radius: 15px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                overflow: hidden;
-            }
-            
-            .header {
-                background: #2c3e50;
-                color: white;
-                padding: 30px;
-                text-align: center;
-            }
-            
-            .header h1 {
-                font-size: 2.5em;
-                margin-bottom: 10px;
-            }
-            
-            .header p {
-                font-size: 1.2em;
-                opacity: 0.9;
-            }
-            
-            .form-section {
-                padding: 30px;
-            }
-            
-            .form-group {
-                margin-bottom: 25px;
-            }
-            
-            label {
-                display: block;
-                margin-bottom: 8px;
-                font-weight: 600;
-                color: #2c3e50;
-                font-size: 14px;
-            }
-            
-            input, textarea {
-                width: 100%;
-                padding: 12px 15px;
-                border: 2px solid #e9ecef;
-                border-radius: 8px;
-                font-size: 16px;
-                transition: border-color 0.3s ease;
-            }
-            
-            input:focus, textarea:focus {
-                border-color: #4285f4;
-                outline: none;
-                box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
-            }
-            
-            .button-group {
-                display: flex;
-                gap: 15px;
-                flex-wrap: wrap;
-                margin-top: 30px;
-            }
-            
-            button {
-                background: #4285f4;
-                color: white;
-                padding: 15px 30px;
-                border: none;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: 600;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            
-            button:hover {
-                background: #3367d6;
-                transform: translateY(-2px);
-            }
-            
-            button:disabled {
-                background: #ccc;
-                cursor: not-allowed;
-                transform: none;
-            }
-            
-            .btn-secondary {
-                background: #6c757d;
-            }
-            
-            .btn-secondary:hover {
-                background: #545b62;
-            }
-            
-            .loading {
-                display: none;
-                text-align: center;
-                padding: 40px;
-                background: #f8f9fa;
-                border-radius: 10px;
-                margin: 20px 0;
-            }
-            
-            .spinner {
-                border: 4px solid #f3f3f3;
-                border-top: 4px solid #4285f4;
-                border-radius: 50%;
-                width: 40px;
-                height: 40px;
-                animation: spin 1s linear infinite;
-                margin: 0 auto 20px;
-            }
-            
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-            
-            .resultado {
-                display: none;
-                margin-top: 30px;
-                padding: 0;
-                border-radius: 10px;
-                border: 1px solid #e9ecef;
-            }
-            
-            .result-header {
-                background: #28a745;
-                color: white;
-                padding: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-            }
-            
-            .result-content {
-                padding: 25px;
-                max-height: 600px;
-                overflow-y: auto;
-            }
-            
-            .section {
-                margin-bottom: 25px;
-                padding: 20px;
-                background: #f8f9fa;
-                border-radius: 8px;
-                border-left: 4px solid #4285f4;
-            }
-            
-            .section h3 {
-                color: #2c3e50;
-                margin-bottom: 15px;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-            
-            .metric-card {
-                background: white;
-                padding: 15px;
-                margin: 10px 0;
-                border-radius: 6px;
-                border: 1px solid #e9ecef;
-            }
-            
-            .estado-ok { color: #28a745; font-weight: bold; }
-            .estado-error { color: #dc3545; font-weight: bold; }
-            .estado-warning { color: #ffc107; font-weight: bold; }
-            
-            .help-text {
-                font-size: 12px;
-                color: #6c757d;
-                margin-top: 5px;
-                font-style: italic;
-            }
-            
-            .required {
-                color: #dc3545;
-            }
-            
-            @media (max-width: 768px) {
-                .container {
-                    margin: 10px;
-                }
-                
-                .header h1 {
-                    font-size: 2em;
-                }
-                
-                .button-group {
-                    flex-direction: column;
-                }
-                
-                button {
-                    width: 100%;
-                }
-            }
-            /* Estilos para listas formateadas */
-            .list-card {
-                background: #f8f9fa !important;
-                border-left: 4px solid #007bff !important;
-            }
-
-            .list-content {
-                font-family: 'Courier New', monospace;
-                font-size: 13px;
-                line-height: 1.4;
-                margin-top: 10px;
-                padding: 10px;
-                background: white;
-                border-radius: 5px;
-                border: 1px solid #e9ecef;
-                max-height: 300px;
-                overflow-y: auto;
-            }
-
-            .list-header {
-                font-weight: bold;
-                color: #2c3e50;
-                margin: 8px 0 4px 0;
-                padding-bottom: 4px;
-                border-bottom: 1px solid #dee2e6;
-            }
-
-            .list-item {
-                padding: 2px 0 2px 15px;
-                margin: 1px 0;
-            }
-
-            .list-bullet {
-                padding: 2px 0 2px 10px;
-                margin: 1px 0;
-            }
-
-            .list-line {
-                padding: 2px 0;
-                margin: 1px 0;
-            }
-
-            .estado-ok { color: #28a745; font-weight: bold; }
-            .estado-error { color: #dc3545; font-weight: bold; }
-            .estado-warning { color: #ffc107; font-weight: bold; }
-
-            .log-output {
-                display: block; /* Ocupa todo el ancho */
-                margin-top: 10px;
-                padding: 10px;
-                background: #ffffff;
-                border: 1px solid #e9ecef;
-                border-radius: 4px;
-                font-family: 'Courier New', monospace; /* Clave para el formato de consola */
-                font-size: 13px;
-                white-space: pre-wrap; /* Asegura que el texto se envuelva si la línea es muy larga */
-            }
-
-            /* Opcional: ajustar el color del texto dentro del pre */
-            .log-output.estado-ok { color: #28a745; }
-            .log-output.estado-error { color: #dc3545; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>🚀 Validador de Repositorios Scaffolder</h1>
-            </div>
-            
-            <div class="form-section">
-                <div class="form-group">
-                    <label for="url">URL del Repositorio Bitbucket <span class="required">*</span></label>
-                    <input type="url" id="url" placeholder="https://bitbucket.globaldevtools.bbva.com/bitbucket/projects/..." required>
-                    <div class="help-text">URL completa del repositorio de Bitbucket</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="rama">Rama a analizar <span class="required">*</span></label>
-                    <input type="text" id="rama" placeholder="develop" value="develop" required>
-                    <div class="help-text">Nombre de la rama que deseas analizar</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="token">Token de Bitbucket</label>
-                    <input type="password" id="token" placeholder="Ingresa tu token si es necesario">
-                </div>
-
-                <div class="button-group">
-                    <button onclick="analizar()" id="btnAnalizar">
-                        <span>🔍</span> Ejecutar Análisis
-                    </button>
-                    <button onclick="limpiar()" class="btn-secondary">
-                        <span>🔄</span> Limpiar
-                    </button>
-                </div>
-            </div>
-
-            <div id="loading" class="loading">
-                <div class="spinner"></div>
-                <h3>⏳ Analizando repositorio...</h3>
-                <p>Esto puede tomar unos momentos mientras revisamos todos los archivos</p>
-            </div>
-
-            <div id="resultado" class="resultado">
-                <!-- Los resultados se cargan aquí dinámicamente -->
-            </div>
-        </div>
-
-        <script>
-            function analizar() {
-                const url = document.getElementById('url').value.trim();
-                const rama = document.getElementById('rama').value.trim();
-                const token = document.getElementById('token').value.trim();
-                
-                if (!url) {
-                    alert('❌ Por favor ingresa una URL válida');
-                    return;
-                }
-                
-                if (!rama) {
-                    alert('❌ Por favor ingresa el nombre de la rama');
-                    return;
-                }
-                
-                // Mostrar loading
-                document.getElementById('loading').style.display = 'block';
-                document.getElementById('resultado').style.display = 'none';
-                document.getElementById('btnAnalizar').disabled = true;
-                
-                // Enviar petición
-                fetch('/analizar', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        url: url,
-                        rama: rama,
-                        token: token
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    mostrarResultado(data);
-                })
-                .catch(error => {
-                    mostrarError(error);
-                })
-                .finally(() => {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('btnAnalizar').disabled = false;
-                });
-            }
-            
-            function mostrarResultado(data) {
-                const resultadoDiv = document.getElementById('resultado');
-                
-                if (data.success) {
-                    let html = `
-                        <div class="result-header">
-                            <h2><span>✅</span> Análisis Completado</h2>
-                            <span>${new Date().toLocaleString()}</span>
-                        </div>
-                        <div class="result-content">    
-                    `;
-                    
-                    // Mostrar datos del análisis
-                    if (data.data && data.columns) {
-                        html += '<div class="section"><h3>📊 Resultados del Análisis</h3>';
-                        
-                        data.columns.forEach((columna, index) => {
-                            if (data.data[columna] && data.data[columna][0]) {
-                                const valor = data.data[columna][0];
-                                const estado = getEstadoFromValor(valor);
-                                
-                                html += `
-                                    <div class="metric-card">
-                                        <strong>${columna}:</strong>
-                                        <span class="${estado.clase}">${valor}</span>
-                                    </div>
-                                `;
-                            }
-                        });
-                        
-                        html += '</div>';
-                    }
-                    
-                    html += `</div></div>`;
-                    resultadoDiv.innerHTML = html;
-                } else {
-                    mostrarError(data.error);
-                }
-                
-                resultadoDiv.style.display = 'block';
-            }
-            
-            function mostrarError(error) {
-                const resultadoDiv = document.getElementById('resultado');
-                const errorMsg = typeof error === 'string' ? error : error.message || 'Error desconocido';
-                
-                resultadoDiv.innerHTML = `
-                    <div class="result-header" style="background: #dc3545;">
-                        <h2><span>❌</span> Error en el Análisis</h2>
-                    </div>
-                    <div class="result-content">
-                        <div class="section">
-                            <h3>⚠️ Detalles del Error</h3>
-                            <div class="metric-card">
-                                <strong>Error:</strong>
-                                <span class="estado-error">${errorMsg}</span>
-                            </div>
-                            <p>Verifica que la URL sea correcta y que tengas acceso al repositorio.</p>
-                        </div>
-                    </div>
-                `;
-                resultadoDiv.style.display = 'block';
-            }
-            
-            function limpiar() {
-                document.getElementById('url').value = '';
-                document.getElementById('rama').value = 'develop';
-                document.getElementById('token').value = '';
-                document.getElementById('resultado').style.display = 'none';
-                document.getElementById('resultado').innerHTML = '';
-            }
-            
-            function getEstadoFromValor(valor) {
-                const texto = String(valor || ""); // fuerza a string incluso si es null/undefined
-                if (texto.includes('✅') || texto.includes('OK')) {
-                    return { clase: 'estado-ok' };
-                } else if (texto.includes('❌') || texto.includes('ERROR')) {
-                    return { clase: 'estado-error' };
-                } else if (texto.includes('⚠️') || texto.includes('WARNING')) {
-                    return { clase: 'estado-warning' };
-                }
-                return { clase: '' };
-            }
-            
-            document.addEventListener('keypress', function(event) {
-                if (event.key === 'Enter') {
-                    analizar();
-                }
-            });
-        </script>
-    </body>
-    </html>
-    '''
-
-# === API ENDPOINTS ===
+    return render_template('index.html') 
+ 
 @app.route('/analizar', methods=['POST'])
 def analizar():
     try:
