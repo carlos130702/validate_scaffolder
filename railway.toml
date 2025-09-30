@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+
+[build.args]
+NIXPACKS_INSTALL_CMD = "python -m pip install --upgrade pip && pip install -r requirements.txt"
+
+[deploy]
+startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120"
