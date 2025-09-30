@@ -1639,6 +1639,22 @@ def index():
             .estado-ok { color: #28a745; font-weight: bold; }
             .estado-error { color: #dc3545; font-weight: bold; }
             .estado-warning { color: #ffc107; font-weight: bold; }
+
+            .log-output {
+                display: block; /* Ocupa todo el ancho */
+                margin-top: 10px;
+                padding: 10px;
+                background: #ffffff;
+                border: 1px solid #e9ecef;
+                border-radius: 4px;
+                font-family: 'Courier New', monospace; /* Clave para el formato de consola */
+                font-size: 13px;
+                white-space: pre-wrap; /* Asegura que el texto se envuelva si la línea es muy larga */
+            }
+
+            /* Opcional: ajustar el color del texto dentro del pre */
+            .log-output.estado-ok { color: #28a745; }
+            .log-output.estado-error { color: #dc3545; }
         </style>
     </head>
     <body>
@@ -1840,10 +1856,8 @@ def analizar():
         
         print(f"🔍 Analizando: {url} (rama: {rama})")
         
-        # Usar tu función corregida
         resultado = data_frame(url, rama, token)
         
-        # Convertir para el frontend
         if hasattr(resultado, 'to_dict'):
             df_dict = resultado.to_dict('list')
             response_data = {
