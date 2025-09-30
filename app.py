@@ -16,72 +16,71 @@ DetectorFactory.seed = 0
 
 app = Flask(__name__)
 
-def connection_to_bitbucket(target_url):
+def connection_to_bitbucket(target_url, token):
     status = False
 
- # 1. Obtén el token de forma segura desde los secretos de Colab
-    access_token = userdata.get('BITBUCKET_TOKEN')
-
-    if not access_token:
-        print("[!] Error: El secreto 'BITBUCKET_TOKEN' no fue encontrado o no tiene acceso habilitado.")
+    # Usar el token que viene del frontend
+    if not token:
+        print("[!] Error: No se proporcionó token")
         return False, None
 
     # 2. Usa el token obtenido en la cabecera
     headers = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36",
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "Authorization": f"Bearer {access_token}",  # Se usa el token secreto
-      "X-Atlassian-Token": "nocheck"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+        "X-Atlassian-Token": "nocheck"
     }
 
     try:
-        response = requests.get(target_url, headers = headers)
-        if(response.status_code == 200):
+        response = requests.get(target_url, headers=headers)
+        if response.status_code == 200:
             status = True
-        # (Opcional) Manejo de errores de conexión
         else:
-            f"[!] Error de conexión: Código de estado {response.status_code}"
-            f"[!] Respuesta: {response.text}"
+            print(f"[!] Error de conexión: Código de estado {response.status_code}")
+            print(f"[!] Respuesta: {response.text}")
     except requests.exceptions.RequestException as e:
-        f"[!] Error de red: {e}"
+        print(f"[!] Error de red: {e}")
         return False, None
 
     return status, response
 
-def get_files_of_repository(url_bitbucket, rama):
+
+def get_files_of_repository(url_bitbucket, rama, token):
     name_branch = rama
     all_files_list = []
-    name_branch_x = "develop" if name_branch.strip() == ""  else name_branch.strip()
-    if(check_format_url(url_bitbucket)):
+    name_branch_x = "develop" if name_branch.strip() == "" else name_branch.strip()
+    
+    if check_format_url(url_bitbucket):
         name_project = url_bitbucket.split("/")[-4]
         name_repository = url_bitbucket.split("/")[-2]
-        target_api = "https://bitbucket.globaldevtools.bbva.com/bitbucket/rest/api/latest/projects/{}/repos/{}/files?at=refs%2Fheads%2F{}&start=0&limit=1000000".format(name_project,
-                                                                                                                                         name_repository,
-                                                                                                                                         name_branch_x)
+        target_api = "https://bitbucket.globaldevtools.bbva.com/bitbucket/rest/api/latest/projects/{}/repos/{}/files?at=refs%2Fheads%2F{}&start=0&limit=1000000".format(
+            name_project, name_repository, name_branch_x
+        )
 
-        status, response = connection_to_bitbucket(target_api)
+        status, response = connection_to_bitbucket(target_api, token)
         if status:
             all_files_list = response.json()['values']
     else:
-        print("[!] The URL does not comply with the specified format. \n Example: https://bitbucket.globaldevtools.bbva.com/bitbucket/projects/{name_project}/repos/{name_repository}/browse")
+        print("[!] The URL does not comply with the specified format.")
 
     return all_files_list
 
-def read_content_file_of_repository(url_bitbucket, filename, name_branch):
-
+def read_content_file_of_repository(url_bitbucket, filename, name_branch, token):
     content_file = ""
-    name_branch_x = "develop" if name_branch.strip() == ""  else name_branch.strip()
+    name_branch_x = "develop" if name_branch.strip() == "" else name_branch.strip()
 
     name_project = url_bitbucket.split("/")[-4]
     name_repository = url_bitbucket.split("/")[-2]
-    target_api = "https://bitbucket.globaldevtools.bbva.com/bitbucket/rest/api/latest/projects/{}/repos/{}/raw/{}?at=refs%2Fheads%2F{}".format(name_project,
-                                                                                                                                      name_repository,
-                                                                                                                                      filename,
-                                                                                                                                      name_branch_x)
-    status, response = connection_to_bitbucket(target_api)
-
-    content_file = response.text
+    target_api = "https://bitbucket.globaldevtools.bbva.com/bitbucket/rest/api/latest/projects/{}/repos/{}/raw/{}?at=refs%2Fheads%2F{}".format(
+        name_project, name_repository, filename, name_branch_x
+    )
+    
+    status, response = connection_to_bitbucket(target_api, token)
+    if status:
+        content_file = response.text
+        
     return content_file
 
 def check_format_url(url_bitbucket):
@@ -172,13 +171,13 @@ def validate_function_names(file_content, filename):
 
     return bad_funcs
 
-def check_function_verbs(repository_files, url_repository, rama):
+def check_function_verbs(repository_files, url_repository, rama, token):
     report_blocks = []
 
     for f in sorted(repository_files, key=lambda x: x.split("/")[-1]):
         fname = f.split("/")[-1]
         if any(re.match(pat, fname) for pat in VALIDATION_PATTERNS):
-            content = read_content_file_of_repository(url_repository, f, rama)
+            content = read_content_file_of_repository(url_repository, f, rama, token)
             bad_funcs = validate_function_names(content, f)
 
             if bad_funcs:
@@ -216,7 +215,7 @@ def validate_no_udf(file_content, filename):
     enumerated = [f"{i}. {h}" for i, h in enumerate(hits, 1)]
     return f"{filename}:\n    " + "\n    ".join(enumerated)
 
-def check_no_udf(repository_files, url_repository, rama):
+def check_no_udf(repository_files, url_repository, rama,token):
     target_patterns = [
         r"^transformations.*\.py$",
         r"^utils\.py$"
@@ -228,7 +227,7 @@ def check_no_udf(repository_files, url_repository, rama):
     for f in repository_files:
         fname = f.split("/")[-1]
         if any(re.match(pat, fname) for pat in target_patterns):
-            content = read_content_file_of_repository(url_repository, f, rama)
+            content = read_content_file_of_repository(url_repository, f, rama, token)
             result = validate_no_udf(content, fname)
             if result != "OK":
                 reports.append(result)
@@ -353,9 +352,9 @@ def validate_field_naming(constants):
 
     return errors
 
-def validate_fields_field(url_repo, branch="develop"):
+def validate_fields_field(url_repo, branch,token):
     # Buscar archivos
-    files = get_files_of_repository(url_repo, branch)
+    files = get_files_of_repository(url_repo, branch,token)
     fields_candidates = [f for f in files if f.endswith("fields.py")]
 
     if not fields_candidates:
@@ -363,7 +362,7 @@ def validate_fields_field(url_repo, branch="develop"):
 
     # Leer contenido
     fields_path = fields_candidates[0]
-    content = read_content_file_of_repository(url_repo, fields_path, branch)
+    content = read_content_file_of_repository(url_repo, fields_path, branch, token)
     constants = extract_constants_from_code(content)
 
     if not constants:
@@ -379,15 +378,15 @@ def validate_fields_field(url_repo, branch="develop"):
         return result
 
 # Función adicional para análisis detallado (opcional)
-def analyze_fields_structure(url_repo, branch="develop"):
-    files = get_files_of_repository(url_repo, branch)
+def analyze_fields_structure(url_repo, branch):
+    files = get_files_of_repository(url_repo, branch, token)
     fields_candidates = [f for f in files if f.endswith("fields.py")]
 
     if not fields_candidates:
         return "⚠️ No se encontró fields.py en el repo"
 
     fields_path = fields_candidates[0]
-    content = read_content_file_of_repository(url_repo, fields_path, branch)
+    content = read_content_file_of_repository(url_repo, fields_path, branch, token)
     constants = extract_constants_from_code(content)
 
     analysis = []
@@ -852,15 +851,11 @@ def validate_functions_in_english(file_content: str, file_path) -> str:
     else:
         return "OK"
 
-def validate_multiple_files_in_english(url_repository, rama, file_paths):
+def validate_multiple_files_in_english(url_repository, rama, file_paths,token):
     results = []
     for file_path in file_paths:
         try:
-            file_content = read_content_file_of_repository(
-                url_repository,
-                file_path,
-                rama
-            )
+            file_content = read_content_file_of_repository(url_repository, file_path, rama, token)
 
             validation_result = validate_functions_in_english(file_content, file_path)
             filename = os.path.basename(file_path)
@@ -911,15 +906,12 @@ def check_commented_code(file_content, file_path):
     else:
         return f"{filename} - ok"
 
-def validate_commented_code_in_files(url_repository, rama, file_paths):
+def validate_commented_code_in_files(url_repository, rama, file_paths,token):
     results = []
     for file_path in file_paths:
         try:
-            file_content = read_content_file_of_repository(
-                url_repository,
-                file_path,
-                rama
-            )
+            file_content = read_content_file_of_repository(url_repository, file_path, rama, token)
+
             comment_check = check_commented_code(file_content, file_path)
             results.append(comment_check)
         except:
@@ -927,8 +919,8 @@ def validate_commented_code_in_files(url_repository, rama, file_paths):
 
     return "\n".join(results)
 
-def data_frame(url_repository, rama):
-    repository_files = get_files_of_repository(url_repository, rama)
+def data_frame(url_repository, rama, token):
+    repository_files = get_files_of_repository(url_repository, rama, token)
     name_project = url_repository.split("/")[-4]
     name_repository = url_repository.split("/")[-2]
 
@@ -963,14 +955,14 @@ def data_frame(url_repository, rama):
     x5 = True
     x6 = True
 
-    file_conf = read_content_file_of_repository(url_repository, file_aplicattion, rama)
+    file_conf = read_content_file_of_repository(url_repository, file_aplicattion, rama, token)
     file_conf_processed = file_conf.replace('\n', '\r\n')
 
     # Procesar archivos para análisis de Spark, Hadoop, etc.
     for fil in files:
-        file = read_content_file_of_repository(url_repository, fil, rama)
+        file = read_content_file_of_repository(url_repository, fil, rama, token)
 
-        # Spark
+       # Spark
         resultado_spark = busqueda_spark(file)
         if resultado_spark and x1:
             result_spark = "❌ Lectura con Spark"
@@ -1018,8 +1010,9 @@ def data_frame(url_repository, rama):
         elif not resultado_base_path and x6:
             result_basepath = "✅ No se esta usando base_path"
 
-    # Version correcta de dataproc_sdk
-    file_requirements = read_content_file_of_repository(url_repository, file_requirements, rama)
+
+   # Version correcta de dataproc_sdk
+    file_requirements = read_content_file_of_repository(url_repository, file_requirements, rama, token)
     resultado_dataproc = version_dataproc_sdk(file_requirements)
     if resultado_dataproc:
         result_dataproc = "✅ Version correcta de dataproc"
@@ -1027,7 +1020,7 @@ def data_frame(url_repository, rama):
         result_dataproc = "❌ Version incorrecta de dataproc"
 
     # Uso de lógica en app.py
-    file_app = read_content_file_of_repository(url_repository, file_app, rama)
+    file_app = read_content_file_of_repository(url_repository, file_app, rama, token)
     resultado_busqlogicaapp = busqueda_logica(file_app)
     if resultado_busqlogicaapp:
         result_busqlogicaapp = "❌ Sí se está haciendo uso de lógica (if, for, else)"
@@ -1054,17 +1047,11 @@ def data_frame(url_repository, rama):
 
     files_to_validate = files_to_validate_main + files_to_validate_tests
 
-    english_validation_general = validate_multiple_files_in_english(
-        url_repository,
-        rama,
-        files_to_validate
-    )
-
-    resultado_pr = validate_commented_code_in_files(
-        url_repository,
-        rama,
-        files_to_validate
-    )
+    english_validation_general = validate_multiple_files_in_english(url_repository, rama, files_to_validate, token)
+    resultado_pr = validate_commented_code_in_files(url_repository, rama, files_to_validate, token)
+    verbos_output = check_function_verbs(repository_files, url_repository, rama, token)
+    conf_check_field_fields = validate_fields_field(url_repository, rama, token)
+    udf_output = check_no_udf(repository_files, url_repository, rama, token)
 
     file_transformations = [
         f for f in repository_files
@@ -1098,7 +1085,7 @@ def data_frame(url_repository, rama):
 
     matches_by_file = {}
     for ruta_verb in file_paths_verb:
-        content = read_content_file_of_repository(url_repository, ruta_verb, rama)
+        content = read_content_file_of_repository(url_repository, ruta_verb, rama, token)
         file_name = os.path.basename(ruta_verb)
         variables = get_variables_short(content)
         variables_match = [var for var in variables if var.split("_")[0] in ListVerb]
@@ -1115,7 +1102,7 @@ def data_frame(url_repository, rama):
     file_paths_pandas = [*file_transformations, *file_test_transformations, file_utils]
     result_pandas_re = {}
     for ruta_pandas in file_paths_pandas:
-        content = read_content_file_of_repository(url_repository, ruta_pandas, rama)
+        content = read_content_file_of_repository(url_repository, ruta_pandas, rama, token)
         result_pandas = validate_no_pandas(content, ruta_pandas)
         result_pandas_re[result_pandas["Archivo"]] = result_pandas["Usa pandas"]
 
@@ -1128,23 +1115,20 @@ def data_frame(url_repository, rama):
     conf_size_check, conf_char_count = check_conf_size(file_conf_processed)
     schema_value_check = check_schema_value(file_conf)
 
-    file_sonar = read_content_file_of_repository(url_repository, file_sonar_properties, rama)
+    file_sonar = read_content_file_of_repository(url_repository, file_sonar_properties, rama, token)
     sonar_coverage_check = check_sonar_coverage(file_sonar)
 
     input_output_check = check_input_output_suffixes(file_conf)
     contributing_readme_check = check_contributing_readme(repository_files)
-    verbos_output = check_function_verbs(repository_files, url_repository, rama)
-    conf_check_field_fields = validate_fields_field(url_repository)
 
-    file_constants_content = read_content_file_of_repository(url_repository, file_constants, rama)
+    file_constants_content = read_content_file_of_repository(url_repository, file_constants, rama, token)
 
-    udf_output = check_no_udf(repository_files, url_repository, rama)
 
     # Check versions
-    file_kaafile_content = read_content_file_of_repository(url_repository, file_kaafile, rama)
-    file_setup_cfg_content = read_content_file_of_repository(url_repository, file_setup_cfg, rama)
-    file_setup_py_content = read_content_file_of_repository(url_repository, file_setup_py, rama)
-    file_init_py_content = read_content_file_of_repository(url_repository, file_init_py, rama)
+    file_kaafile_content = read_content_file_of_repository(url_repository, file_kaafile, rama, token)
+    file_setup_cfg_content = read_content_file_of_repository(url_repository, file_setup_cfg, rama, token)
+    file_setup_py_content = read_content_file_of_repository(url_repository, file_setup_py, rama, token)
+    file_init_py_content = read_content_file_of_repository(url_repository, file_init_py, rama, token)
     resultado_validacion_versiones = validate_versions(file_kaafile_content, file_setup_cfg_content, file_setup_py_content, file_init_py_content)
 
      # ========== PRESENTACIÓN MEJORADA ==========
@@ -1321,67 +1305,6 @@ def data_frame(url_repository, rama):
     }
 
     return pd.DataFrame(data=d)
-
-def main(metodo_carga, rama):
-    print("🚀 INICIANDO ANÁLISIS DE REPOSITORIOS")
-    print("=" * 50)
-
-    if metodo_carga == "engine":
-        url_repository = str(input("🔗 Ingrese las URL a analizar: "))
-        if not url_repository:
-            print("❌ No se ingresó ninguna URL")
-            return None
-
-        print(f"\n📋 Analizando: {url_repository}")
-        print(f"🌿 Rama: {rama}")
-        print("-" * 50)
-
-        resultado = data_frame(url_repository, rama)
-        return resultado
-
-    elif metodo_carga == "csv":
-        try:
-            ruta_csv = input('📂 Ingrese la ruta del documento CSV: ')
-            df_csv = pd.read_csv(ruta_csv)
-            url_repository_csv = list(df_csv["engine"].values)
-
-            print(f"\n📊 Se encontraron {len(url_repository_csv)} repositorios para analizar")
-            print(f"🌿 Rama: {rama}")
-            print("-" * 50)
-
-            resultados = []
-            for i, url in enumerate(url_repository_csv, 1):
-                print(f"\n🔍 Analizando repositorio {i}/{len(url_repository_csv)}: {url.split('/')[-2]}")
-                resultado = data_frame(url, rama)
-                resultados.append(resultado)
-
-            return varios_engines(resultados)
-
-        except Exception as e:
-            print(f"❌ Error al leer el archivo CSV: {e}")
-            return None
-    else:
-        print("❌ Método de carga inválido")
-        return None
-
-metodo_carga = input("Ingrese Metodo de Carga: (engine)(csv) :")
-if not metodo_carga:
-   metodo_carga = "engine"
-
-rama = str(input("Ingrese Rama a analizar:"))
-if not rama:
-   rama = "master"
-
-df = main(metodo_carga, rama)
-
-pd.set_option("display.max_colwidth", None)
-
-if isinstance(df, pd.DataFrame) and "Nombre de función correcta" and "Nombre de campo/variable incorrectos" in df.columns:
-    df = df.style.set_properties(
-        subset=["Nombre de función correcta", "Nombre de campo/variable incorrectos"],
-        **{"white-space": "pre-wrap"}
-    )
-_ = df
 
 
 @app.route('/')
@@ -1626,14 +1549,13 @@ def index():
                 
                 <div class="form-group">
                     <label for="rama">Rama a analizar <span class="required">*</span></label>
-                    <input type="text" id="rama" placeholder="master" value="master" required>
+                    <input type="text" id="rama" placeholder="develop" value="develop" required>
                     <div class="help-text">Nombre de la rama que deseas analizar</div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="token">Token de Bitbucket (opcional)</label>
+                    <label for="token">Token de Bitbucket</label>
                     <input type="password" id="token" placeholder="Ingresa tu token si es necesario">
-                    <div class="help-text">Token para autenticación con la API de Bitbucket</div>
                 </div>
 
                 <div class="button-group">
@@ -1769,24 +1691,24 @@ def index():
             
             function limpiar() {
                 document.getElementById('url').value = '';
-                document.getElementById('rama').value = 'master';
+                document.getElementById('rama').value = 'develop';
                 document.getElementById('token').value = '';
                 document.getElementById('resultado').style.display = 'none';
                 document.getElementById('resultado').innerHTML = '';
             }
             
             function getEstadoFromValor(valor) {
-                if (valor.includes('✅') || valor.includes('OK')) {
+                const texto = String(valor || ""); // fuerza a string incluso si es null/undefined
+                if (texto.includes('✅') || texto.includes('OK')) {
                     return { clase: 'estado-ok' };
-                } else if (valor.includes('❌') || valor.includes('ERROR')) {
+                } else if (texto.includes('❌') || texto.includes('ERROR')) {
                     return { clase: 'estado-error' };
-                } else if (valor.includes('⚠️') || valor.includes('WARNING')) {
+                } else if (texto.includes('⚠️') || texto.includes('WARNING')) {
                     return { clase: 'estado-warning' };
                 }
                 return { clase: '' };
             }
             
-            // Enter key support
             document.addEventListener('keypress', function(event) {
                 if (event.key === 'Enter') {
                     analizar();
@@ -1803,12 +1725,16 @@ def analizar():
     try:
         data = request.get_json()
         url = data.get("url")
-        rama = data.get("rama", "master")
+        rama = data.get("rama", "develop")
+        token = data.get("token")
+        
+        if not url or not token:
+            return jsonify({"success": False, "error": "URL y Token son requeridos"}), 400
         
         print(f"🔍 Analizando: {url} (rama: {rama})")
         
-        # Usar tu función existente
-        resultado = data_frame(url, rama)
+        # Usar tu función corregida
+        resultado = data_frame(url, rama, token)
         
         # Convertir para el frontend
         if hasattr(resultado, 'to_dict'):
@@ -1832,10 +1758,7 @@ def analizar():
         
     except Exception as e:
         print(f"❌ Error: {str(e)}")
-        return jsonify({
-            "success": False, 
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
